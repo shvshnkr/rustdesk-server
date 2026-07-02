@@ -32,7 +32,7 @@ impl deadpool::managed::Manager for DbPool {
 
 #[derive(Clone)]
 pub struct Database {
-    pool: Pool,
+    pub(crate) pool: Pool,
 }
 
 #[derive(Default)]
@@ -65,6 +65,7 @@ impl Database {
         let _ = pool.get().await?; // test
         let db = Database { pool };
         db.create_tables().await?;
+        db.create_registry_tables().await?;
         Ok(db)
     }
 

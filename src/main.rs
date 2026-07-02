@@ -8,6 +8,10 @@ use hbbs::{common::*, *};
 const RMEM: usize = 0;
 
 fn main() -> ResultType<()> {
+    let argv: Vec<String> = std::env::args().collect();
+    if argv.len() > 1 && argv[1] == "registry" {
+        return hbbs::registry_cli::run(&argv[2..]);
+    }
     let _logger = Logger::try_with_env_or_str("info")?
         .log_to_stdout()
         .format(opt_format)

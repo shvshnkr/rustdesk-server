@@ -349,6 +349,14 @@ impl RendezvousServer {
                         return send_rk_res(socket, addr, UUID_MISMATCH).await;
                     } else if !self.check_ip_blocker(&ip, &id).await {
                         return send_rk_res(socket, addr, TOO_FREQUENT).await;
+                    } else if self.pm.db.register_decision(&id).await.is_err() {
+                        log::warn!("registry denied register_pk for {}", id);
+                        return send_rk_res(
+                            socket,
+                            addr,
+                            register_pk_response::Result::SERVER_ERROR,
+                        )
+                        .await;
                     }
                     let peer = self.pm.get_or(&id).await;
                     let (changed, ip_changed) = {
@@ -415,7 +423,13 @@ impl RendezvousServer {
                         }
                     }
                     if changed {
-                        self.pm.update_pk(id, peer, addr, rk.uuid, rk.pk, ip).await;
+                        let res = self
+                            .pm
+                            .update_pk(id.clone(), peer, addr, rk.uuid, rk.pk, ip)
+                            .await;
+                        if res != register_pk_response::Result::OK {
+                            return send_rk_res(socket, addr, res).await;
+                        }
                     }
                     let mut msg_out = RendezvousMessage::new();
                     msg_out.set_register_pk_response(RegisterPkResponse {
@@ -575,6 +589,15 @@ impl RendezvousServer {
         socket_addr: SocketAddr,
         socket: &mut FramedSocket,
     ) -> ResultType<()> {
+        if self.pm.db.register_decision(&id).await.is_err() {
+            log::warn!("registry denied register_peer for {}", id);
+            let mut msg_out = RendezvousMessage::new();
+            msg_out.set_register_peer_response(RegisterPeerResponse {
+                request_pk: false,
+                ..Default::default()
+            });
+            return socket.send(&msg_out, socket_addr).await;
+        }
         let (request_pk, ip_change) = if let Some(old) = self.pm.get_in_memory(&id).await {
             let mut old = old.write().await;
             let ip = socket_addr.ip();

@@ -100,6 +100,10 @@ impl PeerMap {
         ip: String,
     ) -> register_pk_response::Result {
         log::info!("update_pk {} {:?} {:?} {:?}", id, addr, uuid, pk);
+        if let Err(deny) = self.db.register_decision(&id).await {
+            log::warn!("registry denied register_pk for {}: {}", id, deny);
+            return register_pk_response::Result::SERVER_ERROR;
+        }
         let (info_str, guid) = {
             let mut w = peer.write().await;
             w.socket_addr = addr;
